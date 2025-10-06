@@ -15,6 +15,7 @@ TO_EMAIL = os.environ["EMAIL_USER"]  # Send to self
 url = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
 res = requests.get(url)
 data = res.json()
+print("DEBUG: API response:", res.status_code, res.text)
 
 # --- Check next 1 hour rain probability ---
 rain_expected = False
