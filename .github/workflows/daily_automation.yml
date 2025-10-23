@@ -1,0 +1,55 @@
+name: "Daily Automation Tasks (Weather + LeetCode)"
+
+on:
+  schedule:
+    # Weather alert → runs every hour
+    - cron: "0 * * * *"
+    # LeetCode alert → every 10 min from 12am–5am BDT (6pm–11pm UTC)
+    - cron: "*/10 18-23,0-5 * * *"
+  workflow_dispatch:
+
+jobs:
+  weather-alert:
+    name: "🌦️ Weather Alert"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: "Install dependencies"
+        run: |
+          pip install requests
+
+      - name: "Run weather alert script"
+        env:
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: python scripts/check_weather.py
+
+  leetcode-alert:
+    name: "💡 LeetCode Daily Challenge Alert"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: "Install dependencies"
+        run: |
+          pip install requests
+
+      - name: "Run LeetCode daily challenge script"
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: python scripts/check_leetcode_daily.py
