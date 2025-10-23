@@ -4,7 +4,7 @@ on:
   schedule:
     # Weather alert → runs every hour
     - cron: "0 * * * *"
-    # LeetCode alert → every 10 min from 12am–5am BDT (6pm–11pm UTC)
+    # LeetCode alert → every 10 min from 12am–11am BDT (6pm–5am UTC)
     - cron: "*/10 18-23,0-5 * * *"
   workflow_dispatch:
 
@@ -16,16 +16,29 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@v4
 
+      - name: "Compute UTC minute"
+        id: minute
+        run: |
+          MIN=$(date -u +%M)
+          if [ "$MIN" = "00" ]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: "Set up Python"
+        if: ${{ steps.minute.outputs.run == 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: "Install dependencies"
+        if: ${{ steps.minute.outputs.run == 'true' }}
         run: |
           pip install requests
 
       - name: "Run weather alert script"
+        if: ${{ steps.minute.outputs.run == 'true' }}
         env:
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
@@ -35,21 +48,66 @@ jobs:
   leetcode-alert:
     name: "💡 LeetCode Daily Challenge Alert"
     runs-on: ubuntu-latest
+    concurrency:
+      group: leetcode-daily
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
 
+      - name: "Compute BDT date and window"
+        id: bdt
+        run: |
+          BDT_DATE=$(TZ=Asia/Dhaka date +%F)
+          BDT_HOUR=$(TZ=Asia/Dhaka date +%H)
+          echo "date=$BDT_DATE" >> $GITHUB_OUTPUT
+          if [ "$BDT_HOUR" -ge 0 ] && [ "$BDT_HOUR" -le 11 ]; then
+            echo "inwindow=true" >> $GITHUB_OUTPUT
+          else
+            echo "inwindow=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Restore daily cache"
+        id: daily_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/last_daily.txt
+          key: leetcode-daily-${{ steps.bdt.outputs.date }}
+
       - name: "Set up Python"
+        if: ${{ steps.bdt.outputs.inwindow == 'true' && steps.daily_cache.outputs.cache-hit != 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: "Install dependencies"
+        if: ${{ steps.bdt.outputs.inwindow == 'true' && steps.daily_cache.outputs.cache-hit != 'true' }}
         run: |
           pip install requests
 
       - name: "Run LeetCode daily challenge script"
+        if: ${{ steps.bdt.outputs.inwindow == 'true' && steps.daily_cache.outputs.cache-hit != 'true' }}
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
         run: python scripts/check_leetcode_daily.py
+
+      - name: "Check marker file"
+        if: ${{ steps.bdt.outputs.inwindow == 'true' && steps.daily_cache.outputs.cache-hit != 'true' }}
+        id: marker
+        run: |
+          if [ -f scripts/last_daily.txt ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Save daily cache"
+        if: ${{ steps.marker.outputs.exists == 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: scripts/last_daily.txt
+          key: leetcode-daily-${{ steps.bdt.outputs.date }}

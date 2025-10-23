@@ -92,9 +92,13 @@ def save_today_date(today_str):
 
 
 def main():
-    today_bdt = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=6))).date()
+    now_bdt = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=6)))
+    today_bdt = now_bdt.date()
     today_str = str(today_bdt)
     print("📅 Today (BDT):", today_str)
+    if not (0 <= now_bdt.hour <= 11):
+        print("⏱️ Outside allowed window (00:00–11:59 BDT). Exiting.")
+        return
 
     last_sent = read_last_sent_date()
     if last_sent == today_str:
